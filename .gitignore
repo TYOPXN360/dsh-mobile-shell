@@ -1,0 +1,8 @@
+node_modules/
+.test-build/
+.client-build/
+
+# `lib/` IS committed on purpose: it is the shipped artifact. `package.json`
+# points `main` and the client export at it, so `dsh plugin add <git-url>` or a
+# local symlink works without running a build step. `prepare` rebuilds it when
+# the package is installed from source.

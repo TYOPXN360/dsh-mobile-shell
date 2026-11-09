@@ -1,0 +1,9 @@
+# dsh-mobile-shell bundle patch: one row, one plugin, both features.
+#
+# The row carries no config: every behavior is decided at runtime (narrow+touch
+# predicate for the drawer, browser capability for the PWA). The browser half is
+# discovered through package.json `dsh.client`, and the host half serves the
+# manifest, the icons and the service worker.
+- insert:
+    - id: dsh-mobile-shell
+      name: 'dsh-mobile-shell'

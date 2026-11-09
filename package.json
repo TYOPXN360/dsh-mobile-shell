@@ -1,0 +1,60 @@
+{
+  "name": "dsh-mobile-shell",
+  "version": "0.1.0",
+  "description": "窄屏侧边栏抽屉 + 会话页右滑唤出 + 可安装 PWA（DeepSeek Assistant）：一体化移动端外壳，桌面布局零改动",
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "assets",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "pwa",
+    "mobile",
+    "sidebar",
+    "drawer",
+    "deepseek"
+  ],
+  "scripts": {
+    "build": "node scripts/build-client.mjs && node scripts/build-host.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test tests/",
+    "prepare": "node scripts/build-client.mjs && node scripts/build-host.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "typescript": "^6.0.3"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "react": "^18.2.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

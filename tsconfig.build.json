@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "declaration": true,
+    "sourceMap": false,
+    "rootDir": "src",
+    "outDir": "lib",
+    "declarationDir": "lib/types",
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true
+  },
+  "include": ["src/index.ts", "src/routes.ts", "src/pwa/manifest.ts"],
+  "exclude": ["src/client", "node_modules", "lib"]
+}
