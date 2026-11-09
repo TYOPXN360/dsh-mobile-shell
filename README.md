@@ -1,5 +1,8 @@
 # dsh-mobile-shell
 
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+
 DeepSeek Assistant 的**一体化移动端外壳**插件：窄屏侧边栏抽屉 + 可安装 PWA，桌面布局零改动。
 
 一个插件、两个功能，同一条生命周期。
@@ -60,12 +63,14 @@ JavaScript 的武装判断用的是**同一个字符串常量**。因此：
 
 ## 安装
 
+直接从本仓库安装（`lib/` 已随仓库提交，无需构建）：
+
 ```sh
-dsh plugin --profile web add /path/to/dsh-mobile-shell
+dsh plugin --profile web add github:TYOPXN360/dsh-mobile-shell
 dsh --profile web
 ```
 
-或用本地链接开发：
+本地开发用符号链接：
 
 ```sh
 ln -s /path/to/dsh-mobile-shell ~/.dsh/profiles/web/node_modules/dsh-mobile-shell
