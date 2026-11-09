@@ -1,7 +1,7 @@
 # dsh-mobile-shell
 
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
-[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](./LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](./LICENSE)
 
 DeepSeek Assistant 的**一体化移动端外壳**插件：窄屏侧边栏抽屉 + 可安装 PWA，桌面布局零改动。
 
@@ -127,11 +127,24 @@ dsh-mobile-shell/
 **④ 手势必须监听 `touchmove`。**
 只用 pointer 事件在真机上不生效：浏览器一旦把手势判为滚动就会 `pointercancel`，后续 `pointermove` 不再送达。因此在轴锁定后以 `passive: false` 的 `touchmove` 调 `preventDefault()`，把事件流留住；轴锁定**之前**绝不 prevent，否则会破坏正常滚动（WebKit 不会恢复）。
 
-## 资源与许可
-
-- 代码：[MIT](./LICENSE)。
-- `assets/` 下的图标是 `@deepseek-ai/dsh-web-frontend` 随包发布的 **DSH 应用图标**，逐字节复制用于让安装后的 PWA 与宿主界面视觉一致；其版权归 DeepSeek Harness 项目原作者，遵循其原始许可。若你需要替换为自己的品牌，请替换 `assets/` 下的同名文件即可（`scripts/build-host.mjs` 会校验必需图标存在）。
-
 ## License
 
-代码部分 MIT，见 [LICENSE](./LICENSE)。
+本项目的代码以 **GNU General Public License v3.0** 发布，许可证全文见 [LICENSE](./LICENSE)。
+
+```
+dsh-mobile-shell — DeepSeek Harness 移动端外壳插件
+Copyright (C) 2026 TYOPXN360
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, version 3.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+```
+
+**对应源代码。** GPLv3 要求分发二进制/构建产物时一并提供对应源代码。本仓库同时提交了 `src/`、`scripts/` 与已构建的 `lib/`，`npm run build` 可完整复现 `lib/`（已在全新克隆中验证产物字节级一致），因此从本仓库获取即满足该要求。
+
+**关于图标。** `assets/` 下的图标是从 `@deepseek-ai/dsh-web-frontend` 随包发布的 **DSH 应用图标**逐字节复制而来，用于让安装后的 PWA 与宿主界面视觉一致。这部分资源的版权归 DeepSeek Harness 项目原作者，**不在本项目的 GPLv3 授权范围内**，按其原始许可使用。若你需要以不同条款再分发，请替换 `assets/` 下的同名文件（`scripts/build-host.mjs` 会校验必需图标存在）。

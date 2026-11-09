@@ -2,7 +2,7 @@
   "name": "dsh-mobile-shell",
   "version": "0.1.0",
   "description": "窄屏侧边栏抽屉 + 会话页右滑唤出 + 可安装 PWA（DeepSeek Assistant）：一体化移动端外壳，桌面布局零改动",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -13,9 +13,14 @@
   },
   "files": [
     "lib",
+    "src",
+    "scripts",
     "assets",
     "cordis.patch.yml",
-    "README.md"
+    "tsconfig.json",
+    "tsconfig.build.json",
+    "README.md",
+    "LICENSE"
   ],
   "keywords": [
     "dsh",
