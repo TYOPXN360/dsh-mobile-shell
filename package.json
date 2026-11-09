@@ -30,7 +30,7 @@
     "build": "node scripts/build-client.mjs && node scripts/build-host.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "test": "node --test tests/",
-    "prepare": "node scripts/build-client.mjs && node scripts/build-host.mjs"
+    "prepack": "node scripts/build-client.mjs && node scripts/build-host.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
