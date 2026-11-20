@@ -3,9 +3,9 @@
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE?style=flat-square)](https://github.com/deepseek-ai/deepseek-harness)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue?style=flat-square)](./LICENSE)
 
-DeepSeek Assistant 的**一体化移动端外壳**插件：窄屏侧边栏抽屉 + 可安装 PWA，桌面布局零改动。
+DeepSeek Harness 的**一体化移动端外壳**插件：窄屏侧边栏抽屉 + 可安装 PWA + 平滑滚动与淡入，桌面布局零改动。
 
-一个插件、两个功能，同一条生命周期。
+一个插件、四个功能，同一条生命周期。
 
 ---
 
@@ -25,12 +25,38 @@ DeepSeek Assistant 的**一体化移动端外壳**插件：窄屏侧边栏抽屉
 
 设置 → 通用设置 → 最底部新增「**添加为 PWA 应用**」：
 
-- 名称为 **DeepSeek Assistant**，图标**复用 DSH 自带图标**（`icon-192` / `icon-512` / `icon-maskable-512` / `apple-touch-icon`，与宿主 UI 逐字节相同）。
+- 名称为 **DeepSeek Harness**，图标**复用 DSH 自带图标**（`icon-192` / `icon-512` / `icon-maskable-512` / `apple-touch-icon`，与宿主 UI 逐字节相同）。
 - 按钮直接调用浏览器原生安装弹窗；已安装时显示「已安装」。
 - 不可安装时给出**真实原因**，而不是一个永远点不动的按钮：
   - iOS Safari → 提示「分享 → 添加到主屏幕」；
   - 无安装 API → 提示浏览器菜单路径；
   - **非安全上下文**（如 `http://192.168.2.36:3081`）→ 提示在 `chrome://flags` 的 `unsafely-treat-insecure-origin-as-secure` 中把该地址加为可信源。
+
+### 3. 沉浸式状态栏（安装为 PWA 后）
+
+状态栏**不隐藏**：时钟、电量、信号图标仍然可见，只是状态栏背景变透明，页面背景和内容延伸到它下面。
+
+- **Android 10+**：manifest 的 `theme_color` 为 `transparent`；宿主半区在渲染 `index.html` 时（`tapIndex`）把 `viewport-fit=cover` 写进 viewport 声明，客户端再在安装模式补上透明的 `theme-color`。Android 把状态栏背景画成透明，内容可以进入这一条区域。
+- **iOS**：系统不提供完全透明，使用 `apple-mobile-web-app-status-bar-style=black-translucent`，得到深色半透明状态栏 + 白色图标；该 meta 由宿主在返回 HTML 前写入，确保 WebKit 在解析阶段就能读到。页面同样延伸到状态栏下。
+- **安全区**：安装模式下 `<html>` 会带上 `data-dsh-ms-standalone`，样式表据此给 frame 加 `env(safe-area-inset-*)` 内边距。状态栏后面是 frame 自己的背景，标题、按钮、抽屉和宿主的左上角展开按钮都落在安全区内，不会被时钟或刘海挡住。
+- **只在安装模式生效**：普通浏览器标签页不会加安全区内边距，状态栏和地址栏仍由浏览器控制；安装后才切换到透明状态栏 + 安全区布局。
+
+> 已安装的旧版本如果状态栏仍是深色，通常是 Android 缓存的 WebAPK manifest 尚未刷新。先杀掉应用再启动；仍不生效时删除主屏幕图标重新安装一次。
+
+### 4. 平滑滚动与淡入
+
+设置 → 通用设置 → 「添加为 PWA 应用」**下方**新增「平滑滚动与淡入」开关（默认开启，可随时关闭）：
+
+- 新块到达时，旧内容不再瞬移一整行，而是用约 0.3 秒**向上滑入**；
+- 每个新出现的段落、步骤行、工具行和思考块用约 0.18 秒**淡入**，不会整屏突然闪现；
+- **只对真正的新块做平滑上移**：段落内部的自动换行按原生方式稳定推进，不会让整列先下后上地“回弹”；
+- **纯缓出、不弹回、不超调**：位移只朝一个方向收敛；已经绘制过的滚动不会再被延迟反向修正；同时关闭聊天滚动区的下拉回弹；
+- 对助手正文和**思考过程**同时生效；
+- 手机与桌面共用同一套逻辑，只改变聊天列的视觉位移和新节点的透明度，不修改宿主的滚动位置、跟随意图或测量；
+- 只在视图已经跟随到底部时平滑上移；用户向上翻阅历史、切换会话、加载更早历史时不播放滚动动画，也不会让整段历史一起淡入；
+- 尊重系统「减少动态效果」设置；关闭开关后立即恢复原生行为。
+
+实现上不重写宿主聊天，也不拦截 `scrollTop`：观察内容增长与滚动位移，给聊天列叠加一个快速衰减的 `translate`；淡入则用 Web Animations API 只改新节点的 `opacity`。两者都不改变布局，因此不会影响锚点、虚拟列表或输入框。
 
 ---
 
@@ -48,6 +74,8 @@ JavaScript 的武装判断用的是**同一个字符串常量**。因此：
 - 1024px 以上的触屏平板保持原生布局；
 - 桌面端不会出现抽屉按钮、遮罩、中继行，侧边栏宽度与网格列完全不变。
 
+安装模式的安全区规则由 `(display-mode: standalone)` 和 `<html data-dsh-ms-standalone>` 两条路径触发；普通窗口的安全区变量保持 0，桌面浏览器与桌面 PWA 的布局不变。
+
 ---
 
 ## 与 `dsh-full-remote` 的协作（不改其代码）
@@ -58,6 +86,21 @@ JavaScript 的武装判断用的是**同一个字符串常量**。因此：
 - 侧边栏中新增一个**代理行**，点击时转发给该插件自己的启动按钮 —— 面板、徽标、焦点陷阱仍由它完全拥有；
 - 点击后**自动收起侧边栏**，直接呈现它自己的面板；
 - 该插件不存在时，这一行不渲染。
+
+---
+
+## 与宿主 / 远程插件的左上角展开按钮退避
+
+DSH 0.2.2 起，**窄于 768px 的窗口由宿主自己使用模态抽屉**：展开按钮来自宿主的 `shell.leading` 座位（`[data-sidebar-opener]`），遮罩和侧边栏列几何也由宿主拥有。本插件检测到这个状态后只让出**按钮与覆盖几何**：
+
+- 不显示自己的展开按钮，左上角只保留宿主的那一个；
+- 不注入覆盖式列几何（否则宿主的遮罩会盖住本插件固定定位的侧边栏）；
+- **右滑仍然可用**：这是本插件独有的交互，宿主没有。右滑/左滑继续驱动宿主自己的侧边栏开关，宿主负责抽屉本体、遮罩和点击遮罩收起；
+- 宿主退出抽屉模式（例如旋转/缩放到 768–1023px）后，按钮和覆盖层自动恢复。
+
+768–1023px 的触屏区间不受影响：宿主此时仍是 56px 窄栏，没有原生展开按钮，本插件继续提供覆盖式抽屉与按钮。
+
+同样的按钮退避也适用于第三方移动端开关：`dsh-web-mobile` 的 `[data-mobile-nav="toggle"]`，以及任何占据宿主 `shell.leading` 座位的可见控件。检测到它们时，本插件的按钮不会出现，避免两个面板图标叠在同一角；右滑仍然保留。
 
 ---
 
@@ -82,7 +125,7 @@ ln -s /path/to/dsh-mobile-shell ~/.dsh/profiles/web/node_modules/dsh-mobile-shel
 ```sh
 node scripts/build-client.mjs   # 类型检查 + 打包浏览器半区到 lib/client.js
 node scripts/build-host.mjs     # 编译宿主半区 + 拷贝 SW 与图标
-node --test tests/              # 58 项单元测试
+node --test tests/              # 全部单元测试
 ```
 
 ## 结构
@@ -94,10 +137,13 @@ dsh-mobile-shell/
 │  ├─ routes.ts                两侧共享的路由常量
 │  ├─ pwa/
 │  │  ├─ manifest.ts           纯函数式 manifest 构建
+│  │  ├─ viewport.ts           viewport-fit 共享助手（宿主 + 客户端）
+│  │  ├─ index-html.ts         renderIndex 阶段的沉浸 meta 注入
 │  │  └─ service-worker.js     经典脚本（需在站点根目录）
 │  └─ client/
 │     ├─ index.tsx             浏览器半区入口：装配全部部件
 │     ├─ drawer.ts             抽屉状态机（唯一真相源）+ 断点常量
+│     ├─ backoff.ts            左上角归属检测：宿主/第三方已有时整体退避
 │     ├─ frame-bridge.ts       标记宿主 frame、回传右侧栏轨道
 │     ├─ swipe.ts              全局右滑手势（pointer + touch 双通道）
 │     ├─ drawer-button.tsx     会话标题前的展开按钮
@@ -105,15 +151,19 @@ dsh-mobile-shell/
 │     ├─ cockpit-relay.ts      任务控制台中继行
 │     ├─ pwa-installer.ts      安装状态机
 │     ├─ pwa-bootstrap.ts      文档元数据 + SW 注册
-│     ├─ pwa-row.tsx           通用设置最底部的新行
+│     ├─ immersive.ts          运行时兜底：透明 theme-color / 安装模式标记
+│     ├─ pwa-row.tsx           通用设置中的 PWA 行
+│     ├─ smooth-scroll.ts      平滑滚动：偏好存储 + 聊天列视觉补偿引擎
+│     ├─ fade-in.ts            新内容淡入：聊天列新增节点观察 + 透明度动画
+│     ├─ smooth-scroll-row.tsx 通用设置中的平滑滚动与淡入开关
 │     ├─ styles.ts             全部样式（单一 style 标签）
 │     └─ i18n.ts               中英文案
 ├─ assets/                     与宿主逐字节相同的图标
 ├─ lib/                        构建产物
-└─ tests/                      58 项单测
+└─ tests/                      全部单测
 ```
 
-## 三个关键实现点
+## 关键实现点
 
 **① 抽屉是真的侧边栏，不是仿造品。**
 打开抽屉时驱动的是宿主自己的折叠标志（`ctx.layout.toggleSidebar()`），因此挂载的是真实侧边栏子树。本插件只在 CSS 里改几何：把该列从网格里取出、固定定位覆盖在会话上。
@@ -126,6 +176,9 @@ dsh-mobile-shell/
 
 **④ 手势必须监听 `touchmove`。**
 只用 pointer 事件在真机上不生效：浏览器一旦把手势判为滚动就会 `pointercancel`，后续 `pointermove` 不再送达。因此在轴锁定后以 `passive: false` 的 `touchmove` 调 `preventDefault()`，把事件流留住；轴锁定**之前**绝不 prevent，否则会破坏正常滚动（WebKit 不会恢复）。
+
+**⑤ 平滑滚动与淡入都是视觉增强，不是重写聊天。**
+宿主已经把「跟随到底部」做对了；本插件不碰 `scrollTop`，只在新内容块插入后的短窗口内给聊天列叠加一个 `translate`，再让它快速衰减。每个块只平滑一次：块内后续自动换行按原生方式稳定推进；滚动已经绘制后也不会再做延迟反向修正，避免“先上去再弹回来”。淡入只对新插入的内容块播放 `opacity` 动画，不改变高度或布局。因此滚动锚点、历史分页、输入框定位都保持宿主原逻辑，插件升级也不会与宿主抢滚动所有权。
 
 ## License
 

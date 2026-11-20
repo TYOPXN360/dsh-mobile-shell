@@ -14,6 +14,8 @@
  *    (14px title, 12px description, 16px vertical rhythm, hairline separator).
  */
 
+import { BACKOFF_ATTRIBUTE } from './backoff.ts'
+import { STANDALONE_ATTRIBUTE } from './immersive.ts'
 import { RELAY_ATTRIBUTE } from './cockpit-relay.ts'
 import { DRAWER_ATTRIBUTE, NARROW_TOUCH_QUERY } from './drawer.ts'
 import { FRAME_ATTRIBUTE, FRAME_RIGHT_VAR } from './frame-bridge.ts'
@@ -34,6 +36,15 @@ const DRAWER_WIDTH = 'min(86vw, max-content)'
 const SCRIM = 'var(--dsw-alias-bg-mask, rgb(0 0 0 / 45%))'
 
 /**
+ * Gate for the drawer's column overrides. While the host's native mobile drawer
+ * (or another plugin's top-left toggle) owns the affordance, none of these
+ * geometry rules may match: the host already positions its own column, draws
+ * its own mask above this plugin's z-index, and would otherwise be covered by
+ * a fixed overlay that the plugin no longer drives.
+ */
+const DRAWER_ACTIVE = `html:not([${BACKOFF_ATTRIBUTE}])`
+
+/**
  * Everything the plugin renders, as one stylesheet string.
  *
  * Kept as a plain template literal (no CSS-in-JS runtime, no build step) so the
@@ -48,7 +59,7 @@ export const SHELL_CSS = `
      full frame width whether the drawer is open or closed. The right-hand
      track is read back from the custom property the bridge publishes, so a
      touch tablet with the right panel open keeps that panel's column. */
-  [${FRAME_ATTRIBUTE}="frame"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] {
     grid-template-columns: 0 minmax(0, 1fr) var(${FRAME_RIGHT_VAR}, minmax(0, 0px)) !important;
     transition: none !important;
   }
@@ -57,22 +68,22 @@ export const SHELL_CSS = `
      it from grid auto-placement, which would shift the centre into column 1 —
      the ZERO-width track — and blank the whole page. Every remaining column is
      therefore pinned to its own track explicitly. */
-  [${FRAME_ATTRIBUTE}="frame"] > [class*="centerCol"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [class*="centerCol"] {
     grid-column: 2;
     grid-row: 1;
   }
-  [${FRAME_ATTRIBUTE}="frame"] > [class*="rightbarCol"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [class*="rightbarCol"] {
     grid-column: 3;
     grid-row: 1;
   }
-  [${FRAME_ATTRIBUTE}="frame"] > [data-shell-bottom] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [data-shell-bottom] {
     grid-column: 1 / -1;
   }
 
   /* While closed, the shell's rail is not drawn and not hit-testable. The
      column itself stays in the DOM (the shell owns it), which is what lets the
      drawer open without remounting the sidebar subtree. */
-  [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] {
     position: fixed;
     top: 0;
     bottom: 0;
@@ -98,7 +109,7 @@ export const SHELL_CSS = `
   /* Open: slide in, take pointer events, and become the accessibility-visible
      surface. Visibility is switched without delay so the panel is reachable
      from the first frame of the animation. */
-  html[${DRAWER_ATTRIBUTE}="open"] [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] {
+  ${DRAWER_ACTIVE}[${DRAWER_ATTRIBUTE}="open"] [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] {
     transform: translateX(0);
     visibility: visible;
     transition: transform var(--ds-transition-duration-slow, 220ms) var(--ds-ease-in-out, ease),
@@ -107,18 +118,18 @@ export const SHELL_CSS = `
 
   /* The drawer is an overlay: it must not inherit the shell's own scroll
      container geometry, which would clip the footer on short screens. */
-  [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] > * {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] > * {
     height: 100%;
   }
 
   /* The frame's own resize handle belongs to the desktop column model. */
-  [${FRAME_ATTRIBUTE}="frame"] > [class*="handle"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] > [class*="handle"] {
     display: none !important;
   }
 
   /* The conversation column is the full frame now; the header's left padding
      is where the drawer button lands, so keep it in sync with the button. */
-  [${FRAME_ATTRIBUTE}="frame"] [data-dsh-ms="header-leading"] {
+  ${DRAWER_ACTIVE} [${FRAME_ATTRIBUTE}="frame"] [data-dsh-ms="header-leading"] {
     display: inline-flex;
     flex: none;
   }
@@ -177,7 +188,7 @@ export const SHELL_CSS = `
   display: none;
 }
 @media ${NARROW_TOUCH_QUERY} {
-  [data-dsh-ms="backdrop"] {
+  ${DRAWER_ACTIVE} [data-dsh-ms="backdrop"] {
     position: fixed;
     inset: 0;
     z-index: 25;
@@ -190,7 +201,7 @@ export const SHELL_CSS = `
     transition: opacity var(--ds-transition-duration-slow, 220ms) var(--ds-ease-in-out, ease);
     -webkit-tap-highlight-color: transparent;
   }
-  html[${DRAWER_ATTRIBUTE}="open"] [data-dsh-ms="backdrop"] {
+  ${DRAWER_ACTIVE}[${DRAWER_ATTRIBUTE}="open"] [data-dsh-ms="backdrop"] {
     opacity: 1;
     pointer-events: auto;
   }
@@ -258,13 +269,99 @@ export const SHELL_CSS = `
 }
 
 /* ============================================================
+   4b. Smooth-scroll row (General, directly below PWA).
+   ============================================================ */
+/* The same metrics as the shipped General rows. This row is last, so it owns
+   no trailing separator; the PWA row above keeps its own. */
+[data-dsh-ms="setting-row"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 0;
+}
+[data-dsh-ms="setting-row-text"] {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+[data-dsh-ms="setting-row-title"] {
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-primary, #f9fafb);
+}
+[data-dsh-ms="setting-row-desc"] {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary, #adb2b8);
+}
+/* A real switch: 40×22 track, 18px thumb, 18px travel. The thumb moves with
+   the individual translate property so it composes with the track's colour
+   transition and never touches layout. */
+[data-dsh-ms="switch"] {
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dsw-alias-border-l2, rgb(255 255 255 / 20%));
+  cursor: pointer;
+  transition: background-color 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Enlarge the touch target without enlarging the painted track. */
+[data-dsh-ms="switch"]::before {
+  content: "";
+  position: absolute;
+  inset: -11px;
+}
+[data-dsh-ms="switch-thumb"] {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--dsw-alias-bg-layer-1, #fff);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 30%);
+  transition: translate 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+}
+[data-dsh-ms="switch"][aria-checked="true"] {
+  background: var(--dsw-alias-state-business-primary, #4d6bfe);
+}
+[data-dsh-ms="switch"][aria-checked="true"] [data-dsh-ms="switch-thumb"] {
+  translate: 18px 0;
+}
+[data-dsh-ms="switch"]:focus-visible {
+  outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary, #4d6bfe));
+  outline-offset: 2px;
+}
+
+/* ============================================================
    5. Body scroll lock while the drawer is open.
    ============================================================ */
 @media ${NARROW_TOUCH_QUERY} {
-  html[${DRAWER_ATTRIBUTE}="open"] body {
+  ${DRAWER_ACTIVE}[${DRAWER_ATTRIBUTE}="open"] body {
     overflow: hidden;
     touch-action: none;
   }
+}
+
+/* ============================================================
+   6. Top-left backoff: the host (or another plugin) owns the expand button.
+   ============================================================ */
+/* installBackoff 会在 <html> 上写这个属性：表示宿主原生抽屉或第三方移动端
+   开关已经占住左上角。上方的列几何已按它门控；按钮和遮罩的移动端 display
+   规则不在门控块里，因此这里显式让它们消失。 */
+html[${BACKOFF_ATTRIBUTE}] [data-dsh-ms="drawer-button"],
+html[${BACKOFF_ATTRIBUTE}] [data-dsh-ms="backdrop"] {
+  display: none !important;
 }
 
 
@@ -313,5 +410,69 @@ export const SHELL_CSS = `
   [data-dsh-ms="backdrop"] {
     transition: none !important;
   }
+  [data-dsh-ms="switch"],
+  [data-dsh-ms="switch-thumb"] {
+    transition: none !important;
+  }
+}
+
+/* ============================================================
+   9. Installed PWA: edge-to-edge under the system bars.
+   ============================================================ */
+/* The safe-area variables are zero in every ordinary window. An installed
+   window gets the real insets from the display-mode media query at first paint;
+   the attribute covers iOS versions that only expose navigator.standalone.
+   The frame then paints its background through the system-bar strip while its
+   CONTENT is padded by the variables, so the clock and battery icons stay
+   visible and no header control hides behind them. The Windows caption owns its
+   own top padding, so that platform is excluded. */
+:root {
+  --dsh-ms-safe-top: 0px;
+  --dsh-ms-safe-bottom: 0px;
+  --dsh-ms-safe-left: 0px;
+  --dsh-ms-safe-right: 0px;
+}
+@media (display-mode: standalone), (display-mode: fullscreen), (display-mode: minimal-ui) {
+  :root {
+    --dsh-ms-safe-top: env(safe-area-inset-top, 0px);
+    --dsh-ms-safe-bottom: env(safe-area-inset-bottom, 0px);
+    --dsh-ms-safe-left: env(safe-area-inset-left, 0px);
+    --dsh-ms-safe-right: env(safe-area-inset-right, 0px);
+  }
+}
+html[${STANDALONE_ATTRIBUTE}] {
+  --dsh-ms-safe-top: env(safe-area-inset-top, 0px);
+  --dsh-ms-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --dsh-ms-safe-left: env(safe-area-inset-left, 0px);
+  --dsh-ms-safe-right: env(safe-area-inset-right, 0px);
+  background: var(--dsw-alias-bg-base);
+}
+html:not([data-windows-titlebar]) [${FRAME_ATTRIBUTE}="frame"] {
+  box-sizing: border-box;
+  padding-top: var(--dsh-ms-safe-top);
+  padding-bottom: var(--dsh-ms-safe-bottom);
+  padding-left: var(--dsh-ms-safe-left);
+  padding-right: var(--dsh-ms-safe-right);
+}
+
+@media ${NARROW_TOUCH_QUERY} {
+  /* The overlay drawer is fixed to the viewport, so the frame padding never
+     reaches it. Inset the panel's own content too; its background still runs
+     under the bars. This also covers the host's native drawer, which uses the
+     same sidebar column. */
+  [${FRAME_ATTRIBUTE}="frame"] > [class*="sidebarCol"] {
+    padding-top: var(--dsh-ms-safe-top);
+    padding-bottom: var(--dsh-ms-safe-bottom);
+    padding-left: var(--dsh-ms-safe-left);
+    padding-right: var(--dsh-ms-safe-right);
+  }
+}
+
+/* The host's leading seat is absolutely positioned inside the frame, so the
+   frame padding does not move it; lift the opener below the status bar. This is
+   deliberately more specific than the host's .frame[data-sidebar-drawer]
+   .leadingSeat rule. */
+html:not([data-windows-titlebar]) [${FRAME_ATTRIBUTE}="frame"] [data-shell-leading] {
+  top: calc(11px + var(--dsh-ms-safe-top));
 }
 `

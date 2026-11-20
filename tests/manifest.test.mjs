@@ -18,9 +18,14 @@ test('manifest names the product and the shipped icons', async () => {
   const { manifestFor } = await import('../lib/index.js')
   const manifest = manifestFor()
 
-  assert.equal(manifest.name, 'DeepSeek Assistant')
+  assert.equal(manifest.name, 'DeepSeek Harness')
   assert.equal(manifest.short_name, 'DSH')
   assert.equal(manifest.display, 'standalone')
+  // Android 10+ paints the status bar transparent so the page can run behind
+  // it while the system clock/battery icons stay visible. The launch screen
+  // keeps the dark background colour.
+  assert.equal(manifest.theme_color, 'transparent')
+  assert.equal(manifest.background_color, '#111213')
   // Absolute scope: a manifest served from a nested route must not produce a
   // relative start_url, or the installed app launches into that route.
   assert.equal(manifest.start_url, '/')

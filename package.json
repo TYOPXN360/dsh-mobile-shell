@@ -1,7 +1,7 @@
 {
   "name": "dsh-mobile-shell",
   "version": "0.1.0",
-  "description": "窄屏侧边栏抽屉 + 会话页右滑唤出 + 可安装 PWA（DeepSeek Assistant）：一体化移动端外壳，桌面布局零改动",
+  "description": "窄屏侧边栏抽屉 + 会话页右滑唤出 + 可安装 PWA（DeepSeek Harness）+ 平滑滚动与淡入：一体化移动端外壳，桌面布局零改动",
   "license": "GPL-3.0-only",
   "type": "module",
   "main": "lib/index.js",

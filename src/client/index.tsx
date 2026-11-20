@@ -1,7 +1,7 @@
 /**
  * dsh-mobile-shell — browser half.
  *
- * One plugin, two features, one lifecycle:
+ * One plugin, one lifecycle, several mobile enhancements:
  *
  * A. **Narrow-screen sidebar drawer.** On a phone-sized touch viewport the
  *    shell's sidebar rail is hidden and the conversation uses the full width.
@@ -25,12 +25,16 @@ import type { ClientContext } from './host-types.ts'
 import { DrawerButton } from './drawer-button.tsx'
 import { DrawerBackdrop } from './drawer-backdrop.tsx'
 import { PwaRow } from './pwa-row.tsx'
+import { SmoothScrollRow } from './smooth-scroll-row.tsx'
 import { DrawerController, NARROW_TOUCH_QUERY } from './drawer.ts'
+import { installBackoff, type BackoffController } from './backoff.ts'
 import { installFrameBridge } from './frame-bridge.ts'
 import { installSwipeGesture } from './swipe.ts'
 import { installCockpitRelay } from './cockpit-relay.ts'
 import { installPwaBootstrap } from './pwa-bootstrap.ts'
+import { installImmersive } from './immersive.ts'
 import { PwaInstaller } from './pwa-installer.ts'
+import { SmoothScrollController } from './smooth-scroll.ts'
 import { SHELL_CSS } from './styles.ts'
 import { NS, en, zh } from './i18n.ts'
 
@@ -44,10 +48,14 @@ export const inject = ['slots', 'layout', 'locale']
 
 /**
  * Settings row order. Every shipped General item sits at 100 or below, and the
- * section renders ascending, so a value above the ceiling is what puts this row
- * last without depending on which other plugins are installed.
+ * section renders ascending, so values above the ceiling place this plugin's
+ * rows after the shipped preferences without depending on which other plugins
+ * are installed.
  */
 const GENERAL_ROW_ORDER = 1000
+
+/** Directly below the PWA row; the section stacks ascending. */
+const SMOOTH_SCROLL_ROW_ORDER = GENERAL_ROW_ORDER + 1
 
 /** Install the stylesheet, and keep it last in `<head>` so its overrides win. */
 function installStyles(ctx: ClientContext): void {
@@ -74,10 +82,19 @@ function installStyles(ctx: ClientContext): void {
  * - drawer changes → drive `ctx.layout.toggleSidebar()` when it disagrees;
  * - shell changes (the shell collapsed on its own, e.g. the viewport crossed
  *   the breakpoint) → close the drawer silently.
+ *
+ * The host may also own a narrow-screen drawer of its own (DSH 0.2.2+, below
+ * 768px) or a third-party mobile shell may have claimed the top-left control.
+ * `backoff` reports that regime, but it only governs the BUTTON and the overlay
+ * GEOMETRY: the right-swipe gesture is this plugin's own contribution and the
+ * host has none, so it stays armed and drives the host's own sidebar flag.
+ * That is what lets a phone keep "swipe right anywhere to open" even while the
+ * host supplies the drawer, its mask, and the top-left opener.
  * @param ctx - client root context.
+ * @param backoff - the top-left ownership detector.
  * @returns the drawer controller.
  */
-function installDrawer(ctx: ClientContext): DrawerController {
+function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerController {
   const drawer = new DrawerController()
   const narrow = window.matchMedia(NARROW_TOUCH_QUERY)
 
@@ -85,7 +102,9 @@ function installDrawer(ctx: ClientContext): DrawerController {
     /**
      * Push the drawer's state into the shell. The shell's narrow-mode toggle
      * flips its internal expansion flag, which is what mounts the real sidebar
-     * subtree; the CSS then re-anchors that subtree as an overlay.
+     * subtree; in the host's native drawer mode the same call opens the host's
+     * drawer. This must run even while backing off: a swipe is still allowed
+     * to open the host's drawer.
      */
     const syncShell = (): void => {
       const frame = document.querySelector('[data-dsh-mobile-shell="frame"]')
@@ -107,16 +126,36 @@ function installDrawer(ctx: ClientContext): DrawerController {
     narrow.addEventListener('change', onQueryChange)
 
     const frame = installFrameBridge((collapsed) => {
-      // The shell collapsed on its own: reflect it, but do not bounce back.
+      // Always mirror the host's flag, even while backing off: the user may
+      // have opened the host's drawer with its own opener, or closed it with
+      // the host's mask. `reset` never drives the shell back, so this cannot
+      // loop.
       if (collapsed && drawer.isOpen) drawer.closeDrawer('reset')
-      // The shell expanded on its own (rare): adopt it so the two agree.
-      if (!collapsed && !drawer.isOpen && narrow.matches) drawer.openDrawer('reset')
+      if (!collapsed && !drawer.isOpen) drawer.openDrawer('reset')
+    })
+
+    const unsubscribeBackoff = backoff.subscribe((state) => {
+      if (state.active) {
+        // The host owns the button and the drawer geometry now. Keep the
+        // gesture state honest: if the host is collapsed, our drawer is closed
+        // too. If the host is open, leave it open — a swipe may have just
+        // opened it.
+        if (frame.shellCollapsed() && drawer.isOpen) drawer.closeDrawer('reset')
+        return
+      }
+      // The competitor vanished (e.g. 700→800px). If the host's sidebar is
+      // still open, adopt it so the re-armed overlay can show it.
+      if (narrow.matches && !frame.shellCollapsed() && !drawer.isOpen) {
+        drawer.openDrawer('reset')
+      }
     })
 
     const removeGesture = installSwipeGesture({
       onOpen: () => drawer.openDrawer('gesture'),
       onClose: () => drawer.closeDrawer('gesture'),
       isOpen: () => drawer.isOpen,
+      // The swipe is never disarmed by backoff: it is the one interaction the
+      // host does not provide.
       isActive: () => narrow.matches,
     })
 
@@ -133,6 +172,7 @@ function installDrawer(ctx: ClientContext): DrawerController {
       narrow.removeEventListener('change', onQueryChange)
       document.removeEventListener('keydown', onKeyDown, { capture: true })
       removeGesture()
+      unsubscribeBackoff()
       unsubscribe()
       frame.dispose()
       drawer.dispose()
@@ -166,7 +206,7 @@ function installCockpit(ctx: ClientContext, drawer: DrawerController): void {
 }
 
 /**
- * Register the two settings/header seats and start the PWA bootstrap.
+ * Register the settings/header seats and start the page-load services.
  * @param ctx - client root context.
  * @param drawer - the drawer controller the header button drives.
  */
@@ -178,6 +218,23 @@ function installSurfaces(ctx: ClientContext, drawer: DrawerController): void {
     installer.start()
     return () => installer.dispose()
   }, 'dsh-mobile-shell: pwa installer')
+
+  // Smooth tail motion runs from page load too: opening Settings to switch it
+  // on must not be a precondition for the next message to animate.
+  const smoothScroll = new SmoothScrollController()
+  ctx.effect(() => {
+    smoothScroll.start()
+    return () => smoothScroll.dispose()
+  }, 'dsh-mobile-shell: smooth scroll')
+
+  // Edge-to-edge document metadata: viewport-fit=cover, the transparent
+  // status-bar colour, and the standalone flag the stylesheet keys on. This
+  // runs before the bootstrap so the phone lays the page out with the safe-area
+  // insets already unlocked.
+  ctx.effect(() => {
+    const immersive = installImmersive()
+    return () => immersive.dispose()
+  }, 'dsh-mobile-shell: immersive pwa chrome')
 
   // Document metadata plus the service worker: page-load work, not panel work.
   ctx.effect(() => {
@@ -208,6 +265,15 @@ function installSurfaces(ctx: ClientContext, drawer: DrawerController): void {
     locale: NS,
     inject: () => ({ installer }),
   }, PwaRow))
+
+  // The smooth-scroll switch, directly below the install row.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'dsh-mobile-shell-smooth-scroll',
+    order: SMOOTH_SCROLL_ROW_ORDER,
+    locale: NS,
+    inject: () => ({ smoothScroll }),
+  }, SmoothScrollRow))
 }
 
 /**
@@ -221,7 +287,14 @@ export function apply(ctx: ClientContext): void {
   )
 
   installStyles(ctx)
-  const drawer = installDrawer(ctx)
+
+  // Who owns the phone's top-left expand affordance? Decided before the drawer
+  // is wired, so a page opened at phone width starts dormant instead of
+  // flashing a second panel icon.
+  const backoff = installBackoff(document)
+  ctx.effect(() => () => backoff.dispose(), 'dsh-mobile-shell: top-left backoff')
+
+  const drawer = installDrawer(ctx, backoff)
   installCockpit(ctx, drawer)
   installSurfaces(ctx, drawer)
 }

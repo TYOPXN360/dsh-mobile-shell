@@ -20,6 +20,12 @@ export interface WebServerFace {
         path: string;
         handler: (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
     }): unknown;
+    /**
+     * Register a raw index.html transform. Optional: older host builds predate
+     * the index-injection seat, and the browser half still covers them at
+     * runtime.
+     */
+    tapIndex?(transform: (html: string) => string): () => void;
 }
 /** Context shape inside the `webServer` inject scope. */
 export interface ScopedContext extends HostContext {

@@ -27,7 +27,7 @@ import { isSecureContext } from './pwa-installer.ts'
 const OWNED = 'data-dsh-ms-bootstrap'
 
 /** Product title used by the iOS home-screen label. */
-const APPLE_TITLE = 'DeepSeek Assistant'
+const APPLE_TITLE = 'DeepSeek Harness'
 
 /**
  * The cache bucket the current worker owns. Must match `CACHE` in

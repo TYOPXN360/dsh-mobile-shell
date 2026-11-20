@@ -1,10 +1,10 @@
 /**
  * The General-settings row: "添加为 PWA 应用".
  *
- * Registered into `settings.general.item` with the highest order in the
- * composition, which is the documented way to land at the BOTTOM of the General
- * section — the section stacks its items by `order` and this plugin must not
- * sit between the shipped preferences.
+ * Registered into `settings.general.item` above every shipped item, which is
+ * the documented way to land at the BOTTOM of the General section — the section
+ * stacks its items by `order`. The smooth-scroll row sits directly below this
+ * one; both stay after the shipped preferences.
  *
  * The row is a control with four honest states, never a button that pretends to
  * work:

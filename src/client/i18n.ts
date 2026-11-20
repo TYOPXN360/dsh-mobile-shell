@@ -1,7 +1,7 @@
 /**
- * Locale dictionaries for the two surfaces this plugin adds: the drawer
- * control in the session header and the "add to home screen" row in General
- * settings.
+ * Locale dictionaries for the surfaces this plugin adds: the drawer control in
+ * the session header, the "add to home screen" row, and the motion row in
+ * General settings.
  *
  * Kept in one flat namespace so the whole plugin owns exactly one dictionary;
  * the shell composes keys, it never ships copy of its own.
@@ -19,7 +19,7 @@ export const zh = {
   /** Settings row title. */
   pwaTitle: '添加为 PWA 应用',
   /** Settings row description. */
-  pwaDesc: '像原生应用一样安装 DeepSeek Assistant，从桌面图标直接打开',
+  pwaDesc: '像原生应用一样安装 DeepSeek Harness，从桌面图标直接打开',
   /** Install button label. */
   pwaInstall: '安装',
   /** Shown once the app already runs as an installed app. */
@@ -41,6 +41,10 @@ export const zh = {
   pwaManualHint: '在浏览器菜单中选择「安装应用」或「添加到主屏幕」',
   /** Shown when the install prompt was dismissed or failed. */
   pwaDismissed: '已取消安装',
+  /** Smooth-scroll settings row title. */
+  smoothTitle: '平滑滚动与淡入',
+  /** Smooth-scroll settings row description. */
+  smoothDesc: '新内容淡入、旧内容平滑上移，不回弹；思考过程同样生效',
 } as const
 
 /** English copy, key-for-key with {@link zh}. */
@@ -48,7 +52,7 @@ export const en: Record<keyof typeof zh, string> = {
   openSidebar: 'Open sidebar',
   closeSidebar: 'Close sidebar',
   pwaTitle: 'Add as PWA app',
-  pwaDesc: 'Install DeepSeek Assistant like a native app and open it from a desktop icon',
+  pwaDesc: 'Install DeepSeek Harness like a native app and open it from a desktop icon',
   pwaInstall: 'Install',
   pwaInstalled: 'Installed',
   pwaNotReady: 'Not installable yet',
@@ -58,6 +62,8 @@ export const en: Record<keyof typeof zh, string> = {
   pwaIosHint: 'In Safari, tap Share → Add to Home Screen',
   pwaManualHint: 'Open the browser menu and choose "Install app" or "Add to Home Screen"',
   pwaDismissed: 'Install cancelled',
+  smoothTitle: 'Smooth scroll & fade-in',
+  smoothDesc: 'New content fades in while old lines glide upward, with no bounce; reasoning included',
 }
 
 /** Key union shared by both dictionaries. */
