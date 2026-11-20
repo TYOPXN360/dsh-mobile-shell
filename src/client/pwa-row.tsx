@@ -3,8 +3,9 @@
  *
  * Registered into `settings.general.item` above every shipped item, which is
  * the documented way to land at the BOTTOM of the General section — the section
- * stacks its items by `order`. The smooth-scroll row sits directly below this
- * one; both stay after the shipped preferences.
+ * stacks its items by `order`. It sits in the plugin's own group, below the
+ * mobile-adaptation switch and above the motion switch; all three share one row
+ * grammar and the section divider.
  *
  * The row is a control with four honest states, never a button that pretends to
  * work:
@@ -61,10 +62,10 @@ export function PwaRow({ t, installer }: SlotProps<PwaRowInjected>): React.React
   const disabled = state !== 'ready' || busy
 
   return (
-    <div data-dsh-ms="pwa-row">
-      <div data-dsh-ms="pwa-row-text">
-        <div data-dsh-ms="pwa-row-title">{t('pwaTitle')}</div>
-        <div data-dsh-ms="pwa-row-desc">{hint ?? t('pwaDesc')}</div>
+    <div data-dsh-ms="setting-row" data-dsh-ms-setting="pwa">
+      <div data-dsh-ms="setting-row-text">
+        <div data-dsh-ms="setting-row-title">{t('pwaTitle')}</div>
+        <div data-dsh-ms="setting-row-desc">{hint ?? t('pwaDesc')}</div>
       </div>
       <button
         type="button"

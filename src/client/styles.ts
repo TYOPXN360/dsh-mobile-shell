@@ -18,6 +18,7 @@ import { BACKOFF_ATTRIBUTE } from './backoff.ts'
 import { STANDALONE_ATTRIBUTE } from './immersive.ts'
 import { RELAY_ATTRIBUTE } from './cockpit-relay.ts'
 import { DRAWER_ATTRIBUTE, NARROW_TOUCH_QUERY } from './drawer.ts'
+import { MOBILE_ATTRIBUTE, MOBILE_OFF } from './mobile.ts'
 import { FRAME_ATTRIBUTE, FRAME_RIGHT_VAR } from './frame-bridge.ts'
 
 /**
@@ -41,8 +42,15 @@ const SCRIM = 'var(--dsw-alias-bg-mask, rgb(0 0 0 / 45%))'
  * geometry rules may match: the host already positions its own column, draws
  * its own mask above this plugin's z-index, and would otherwise be covered by
  * a fixed overlay that the plugin no longer drives.
+ *
+ * The same gate also carries the reader's own switch: `data-dsh-ms-mobile="off"`
+ * stands every drawer rule down and leaves the host's native narrow layout in
+ * place. Absence of the attribute means ON, so the default paint is unchanged.
  */
-const DRAWER_ACTIVE = `html:not([${BACKOFF_ATTRIBUTE}])`
+const DRAWER_ACTIVE = `html:not([${BACKOFF_ATTRIBUTE}]):not([${MOBILE_ATTRIBUTE}="${MOBILE_OFF}"])`
+
+/** Selector prefix for features the mobile-adaptation switch owns. */
+const MOBILE_ACTIVE = `html:not([${MOBILE_ATTRIBUTE}="${MOBILE_OFF}"])`
 
 /**
  * Everything the plugin renders, as one stylesheet string.
@@ -208,36 +216,47 @@ export const SHELL_CSS = `
 }
 
 /* ============================================================
-   4. Settings row (General section, last item).
+   4. Settings group (General, after the shipped preferences).
    ============================================================ */
-[data-dsh-ms="pwa-row"] {
+/* The shipped General rows separate themselves with this exact hairline
+   (.5px solid var(--dsw-alias-border-l2)). The plugin keeps that rhythm and
+   adds ONE divider above its rows, so the group reads as its own region rather
+   than trailing the current-version row. */
+[data-dsh-ms="section-divider"] {
+  height: 0;
+  margin: 8px 0 0;
+  border-top: 0.5px solid var(--dsw-alias-border-l2, rgb(255 255 255 / 12%));
+}
+[data-dsh-ms="setting-row"] {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 16px 0;
-  border-bottom: 1px solid var(--dsw-alias-border-l3, rgb(255 255 255 / 12%));
+  border-bottom: 0.5px solid var(--dsw-alias-border-l2, rgb(255 255 255 / 12%));
 }
-[data-dsh-ms="pwa-row"]:last-child {
+/* The section's own CSS already removes the last row's border; this keeps the
+   invariant if the shell's wrapper changes. */
+[data-dsh-ms="setting-row"]:last-child {
   border-bottom: none;
 }
-[data-dsh-ms="pwa-row-text"] {
+[data-dsh-ms="setting-row-text"] {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   min-width: 0;
   flex: 1;
 }
-[data-dsh-ms="pwa-row-title"] {
+[data-dsh-ms="setting-row-title"] {
   font-size: 14px;
   line-height: 22px;
   color: var(--dsw-alias-label-primary, #f9fafb);
 }
-[data-dsh-ms="pwa-row-desc"] {
+[data-dsh-ms="setting-row-desc"] {
   font-size: 12px;
   line-height: 18px;
   color: var(--dsw-alias-label-tertiary, #adb2b8);
 }
-[data-dsh-ms="pwa-row-desc"] a {
+[data-dsh-ms="setting-row-desc"] a {
   color: inherit;
   text-decoration: underline;
 }
@@ -268,34 +287,6 @@ export const SHELL_CSS = `
   }
 }
 
-/* ============================================================
-   4b. Smooth-scroll row (General, directly below PWA).
-   ============================================================ */
-/* The same metrics as the shipped General rows. This row is last, so it owns
-   no trailing separator; the PWA row above keeps its own. */
-[data-dsh-ms="setting-row"] {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px 0;
-}
-[data-dsh-ms="setting-row-text"] {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1;
-}
-[data-dsh-ms="setting-row-title"] {
-  font-size: 14px;
-  line-height: 22px;
-  color: var(--dsw-alias-label-primary, #f9fafb);
-}
-[data-dsh-ms="setting-row-desc"] {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--dsw-alias-label-tertiary, #adb2b8);
-}
 /* A real switch: 40×22 track, 18px thumb, 18px travel. The thumb moves with
    the individual translate property so it composes with the track's colour
    transition and never touches layout. */
@@ -364,6 +355,14 @@ html[${BACKOFF_ATTRIBUTE}] [data-dsh-ms="backdrop"] {
   display: none !important;
 }
 
+/* The reader's own switch retires the same two controls. The overlay geometry
+   and the visible backdrop state are already behind DRAWER_ACTIVE; the button
+   and the scrim's baseline live outside that block. */
+html[${MOBILE_ATTRIBUTE}="${MOBILE_OFF}"] [data-dsh-ms="drawer-button"],
+html[${MOBILE_ATTRIBUTE}="${MOBILE_OFF}"] [data-dsh-ms="backdrop"] {
+  display: none !important;
+}
+
 
 /* ============================================================
    7. Remote task console: hidden from the frame corner, mirrored in the drawer.
@@ -374,10 +373,10 @@ html[${BACKOFF_ATTRIBUTE}] [data-dsh-ms="backdrop"] {
      button is instead reached through the relay row in the drawer. The panel
      and its backdrop keep working exactly as shipped — only the corner entry
      disappears. */
-  [data-remote-cockpit] > button {
+  ${MOBILE_ACTIVE} [data-remote-cockpit] > button {
     display: none !important;
   }
-  [data-remote-cockpit] > [class*="backdrop"] {
+  ${MOBILE_ACTIVE} [data-remote-cockpit] > [class*="backdrop"] {
     /* When the panel is opened from the drawer it is still the console's own
        backdrop; keep it above the drawer so a tap outside closes the console
        before it closes the drawer. */
@@ -386,7 +385,7 @@ html[${BACKOFF_ATTRIBUTE}] [data-dsh-ms="backdrop"] {
 
   /* The relay row adopts the shipped row classes (glyph + title), so only the
      count badge needs styling: the shipped rows have no badge. */
-  [${RELAY_ATTRIBUTE}] > [data-dsh-ms-cockpit-count] {
+  ${MOBILE_ACTIVE} [${RELAY_ATTRIBUTE}] > [data-dsh-ms-cockpit-count] {
     flex: none;
     min-width: 18px;
     height: 18px;

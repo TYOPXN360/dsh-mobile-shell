@@ -41,6 +41,10 @@ export const zh = {
   pwaManualHint: '在浏览器菜单中选择「安装应用」或「添加到主屏幕」',
   /** Shown when the install prompt was dismissed or failed. */
   pwaDismissed: '已取消安装',
+  /** Mobile-adaptation settings row title. */
+  mobileTitle: '移动端适配',
+  /** Mobile-adaptation settings row description. */
+  mobileDesc: '窄屏下用抽屉代替侧边栏，支持右滑展开；关闭后恢复宿主的原生布局',
   /** Smooth-scroll settings row title. */
   smoothTitle: '平滑滚动与淡入',
   /** Smooth-scroll settings row description. */
@@ -62,6 +66,8 @@ export const en: Record<keyof typeof zh, string> = {
   pwaIosHint: 'In Safari, tap Share → Add to Home Screen',
   pwaManualHint: 'Open the browser menu and choose "Install app" or "Add to Home Screen"',
   pwaDismissed: 'Install cancelled',
+  mobileTitle: 'Mobile layout',
+  mobileDesc: 'Use an overlay drawer with right-swipe on narrow screens; turn off to restore the host layout',
   smoothTitle: 'Smooth scroll & fade-in',
   smoothDesc: 'New content fades in while old lines glide upward, with no bounce; reasoning included',
 }

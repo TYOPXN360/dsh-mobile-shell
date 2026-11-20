@@ -24,9 +24,12 @@
 import type { ClientContext } from './host-types.ts'
 import { DrawerButton } from './drawer-button.tsx'
 import { DrawerBackdrop } from './drawer-backdrop.tsx'
+import { MobileRow } from './mobile-row.tsx'
 import { PwaRow } from './pwa-row.tsx'
+import { SectionDivider } from './section-divider.tsx'
 import { SmoothScrollRow } from './smooth-scroll-row.tsx'
 import { DrawerController, NARROW_TOUCH_QUERY } from './drawer.ts'
+import { MobileController } from './mobile.ts'
 import { installBackoff, type BackoffController } from './backoff.ts'
 import { installFrameBridge } from './frame-bridge.ts'
 import { installSwipeGesture } from './swipe.ts'
@@ -50,12 +53,18 @@ export const inject = ['slots', 'layout', 'locale']
  * Settings row order. Every shipped General item sits at 100 or below, and the
  * section renders ascending, so values above the ceiling place this plugin's
  * rows after the shipped preferences without depending on which other plugins
- * are installed.
+ * are installed. The divider starts the group; the three feature rows follow.
  */
-const GENERAL_ROW_ORDER = 1000
+const SECTION_DIVIDER_ORDER = 998
+
+/** The mobile-adaptation switch. */
+const MOBILE_ROW_ORDER = 999
+
+/** The PWA install row; the anchor the other rows are described against. */
+const PWA_ROW_ORDER = 1000
 
 /** Directly below the PWA row; the section stacks ascending. */
-const SMOOTH_SCROLL_ROW_ORDER = GENERAL_ROW_ORDER + 1
+const SMOOTH_SCROLL_ROW_ORDER = PWA_ROW_ORDER + 1
 
 /** Install the stylesheet, and keep it last in `<head>` so its overrides win. */
 function installStyles(ctx: ClientContext): void {
@@ -92,9 +101,14 @@ function installStyles(ctx: ClientContext): void {
  * host supplies the drawer, its mask, and the top-left opener.
  * @param ctx - client root context.
  * @param backoff - the top-left ownership detector.
+ * @param mobile - the reader's mobile-adaptation switch.
  * @returns the drawer controller.
  */
-function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerController {
+function installDrawer(
+  ctx: ClientContext,
+  backoff: BackoffController,
+  mobile: MobileController,
+): DrawerController {
   const drawer = new DrawerController()
   const narrow = window.matchMedia(NARROW_TOUCH_QUERY)
 
@@ -107,6 +121,9 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
      * to open the host's drawer.
      */
     const syncShell = (): void => {
+      // The switch is off: the host's native narrow layout is in charge, so the
+      // plugin must not move the shell's sidebar flag at all.
+      if (!mobile.snapshot().enabled) return
       const frame = document.querySelector('[data-dsh-mobile-shell="frame"]')
       const shellOpen = frame !== null && !frame.hasAttribute('data-sidebar-collapsed')
       if (drawer.isOpen !== shellOpen) ctx.layout.toggleSidebar()
@@ -126,6 +143,9 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
     narrow.addEventListener('change', onQueryChange)
 
     const frame = installFrameBridge((collapsed) => {
+      // Mirroring is part of the adaptation: with the switch off the drawer is
+      // dormant, so a host-initiated collapse must not wake it.
+      if (!mobile.snapshot().enabled) return
       // Always mirror the host's flag, even while backing off: the user may
       // have opened the host's drawer with its own opener, or closed it with
       // the host's mask. `reset` never drives the shell back, so this cannot
@@ -145,6 +165,19 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
       }
       // The competitor vanished (e.g. 700→800px). If the host's sidebar is
       // still open, adopt it so the re-armed overlay can show it.
+      if (mobile.snapshot().enabled && narrow.matches && !frame.shellCollapsed() && !drawer.isOpen) {
+        drawer.openDrawer('reset')
+      }
+    })
+
+    // Switching the adaptation off must leave no fixed overlay behind and no
+    // stale "open" state. Switching it back on adopts an already-open host
+    // sidebar, exactly like leaving backoff.
+    const unsubscribeMobile = mobile.subscribe((state) => {
+      if (!state.enabled) {
+        if (drawer.isOpen) drawer.closeDrawer('reset')
+        return
+      }
       if (narrow.matches && !frame.shellCollapsed() && !drawer.isOpen) {
         drawer.openDrawer('reset')
       }
@@ -155,8 +188,8 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
       onClose: () => drawer.closeDrawer('gesture'),
       isOpen: () => drawer.isOpen,
       // The swipe is never disarmed by backoff: it is the one interaction the
-      // host does not provide.
-      isActive: () => narrow.matches,
+      // host does not provide. The reader's switch still owns it.
+      isActive: () => narrow.matches && mobile.snapshot().enabled,
     })
 
     // Escape closes the drawer, matching every other dismissible layer.
@@ -172,6 +205,7 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
       narrow.removeEventListener('change', onQueryChange)
       document.removeEventListener('keydown', onKeyDown, { capture: true })
       removeGesture()
+      unsubscribeMobile()
       unsubscribeBackoff()
       unsubscribe()
       frame.dispose()
@@ -195,13 +229,42 @@ function installDrawer(ctx: ClientContext, backoff: BackoffController): DrawerCo
  * panel the user just asked for.
  * @param ctx - client root context.
  * @param drawer - the drawer controller, closed on activation.
+ * @param mobile - the reader's mobile-adaptation switch.
  */
-function installCockpit(ctx: ClientContext, drawer: DrawerController): void {
+function installCockpit(
+  ctx: ClientContext,
+  drawer: DrawerController,
+  mobile: MobileController,
+): void {
   ctx.effect(() => {
-    const relay = installCockpitRelay({
-      onActivate: () => drawer.closeDrawer('backdrop'),
-    })
-    return () => relay.dispose()
+    let relay: ReturnType<typeof installCockpitRelay> | null = null
+
+    /**
+     * The relay only exists while the adaptation does: with the switch off the
+     * console keeps its own floating launcher, and injecting a second entry
+     * into the host's sidebar would duplicate it.
+     */
+    const sync = (): void => {
+      if (mobile.snapshot().enabled) {
+        if (relay === null) {
+          relay = installCockpitRelay({
+            onActivate: () => drawer.closeDrawer('backdrop'),
+          })
+        }
+        return
+      }
+      relay?.dispose()
+      relay = null
+    }
+
+    sync()
+    const unsubscribe = mobile.subscribe(sync)
+
+    return () => {
+      unsubscribe()
+      relay?.dispose()
+      relay = null
+    }
   }, 'dsh-mobile-shell: cockpit relay')
 }
 
@@ -209,8 +272,13 @@ function installCockpit(ctx: ClientContext, drawer: DrawerController): void {
  * Register the settings/header seats and start the page-load services.
  * @param ctx - client root context.
  * @param drawer - the drawer controller the header button drives.
+ * @param mobile - the reader's mobile-adaptation switch.
  */
-function installSurfaces(ctx: ClientContext, drawer: DrawerController): void {
+function installSurfaces(
+  ctx: ClientContext,
+  drawer: DrawerController,
+  mobile: MobileController,
+): void {
   // The install controller must exist for as long as the plugin does: the
   // browser's install event arrives at page load, long before Settings opens.
   const installer = new PwaInstaller()
@@ -257,11 +325,28 @@ function installSurfaces(ctx: ClientContext, drawer: DrawerController): void {
     inject: () => ({ drawer }),
   }, DrawerBackdrop))
 
-  // The install row, at the bottom of General settings.
+  // One official-token divider starts this plugin's group, so the three rows
+  // below read as their own region rather than trailing the version row.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'dsh-mobile-shell-section',
+    order: SECTION_DIVIDER_ORDER,
+  }, SectionDivider))
+
+  // The mobile-adaptation switch: the drawer, the gesture and the relay.
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'dsh-mobile-shell-mobile',
+    order: MOBILE_ROW_ORDER,
+    locale: NS,
+    inject: () => ({ mobile }),
+  }, MobileRow))
+
+  // The install row, below the adaptation switch.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
     id: 'dsh-mobile-shell-pwa',
-    order: GENERAL_ROW_ORDER,
+    order: PWA_ROW_ORDER,
     locale: NS,
     inject: () => ({ installer }),
   }, PwaRow))
@@ -288,13 +373,21 @@ export function apply(ctx: ClientContext): void {
 
   installStyles(ctx)
 
+  // The adaptation switch must publish its marker before the drawer is wired,
+  // so a disabled page never paints the overlay for a frame.
+  const mobile = new MobileController()
+  ctx.effect(() => {
+    mobile.start()
+    return () => mobile.dispose()
+  }, 'dsh-mobile-shell: mobile preference')
+
   // Who owns the phone's top-left expand affordance? Decided before the drawer
   // is wired, so a page opened at phone width starts dormant instead of
   // flashing a second panel icon.
   const backoff = installBackoff(document)
   ctx.effect(() => () => backoff.dispose(), 'dsh-mobile-shell: top-left backoff')
 
-  const drawer = installDrawer(ctx, backoff)
-  installCockpit(ctx, drawer)
-  installSurfaces(ctx, drawer)
+  const drawer = installDrawer(ctx, backoff, mobile)
+  installCockpit(ctx, drawer, mobile)
+  installSurfaces(ctx, drawer, mobile)
 }

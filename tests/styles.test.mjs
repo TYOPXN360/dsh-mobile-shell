@@ -41,19 +41,22 @@ test('the grid override republishes the right track instead of dropping it', asy
 test('the drawer geometry stands down when the host owns the mobile drawer', async () => {
   const { SHELL_CSS } = await loadModule('styles')
   const { BACKOFF_ATTRIBUTE } = await loadModule('backoff')
+  const { MOBILE_ATTRIBUTE } = await loadModule('mobile')
 
   // Every override that re-anchors the shell's columns must be gated. Without
   // the gate, the host's own drawer mask (z-index 70) covers this plugin's
-  // fixed column (z-index 30) and the phone drawer becomes untappable.
+  // fixed column (z-index 30) and the phone drawer becomes untappable. The same
+  // gate also carries the reader's own mobile-adaptation switch.
+  const gate = `html:not\\(\\[${BACKOFF_ATTRIBUTE}\\]\\):not\\(\\[${MOBILE_ATTRIBUTE}="off"\\]\\)`
   assert.match(
     SHELL_CSS,
-    new RegExp(`html:not\\(\\[${BACKOFF_ATTRIBUTE}\\]\\) \\[data-dsh-mobile-shell="frame"\\] \\{[^}]*grid-template-columns`),
-    'the frame override must be behind the backoff gate',
+    new RegExp(`${gate} \\[data-dsh-mobile-shell="frame"\\] \\{[^}]*grid-template-columns`),
+    'the frame override must be behind the backoff and switch gates',
   )
   assert.match(
     SHELL_CSS,
-    new RegExp(`html:not\\(\\[${BACKOFF_ATTRIBUTE}\\]\\)\\[data-dsh-drawer="open"\\]`),
-    'the open state must be behind the backoff gate',
+    new RegExp(`${gate}\\[data-dsh-drawer="open"\\]`),
+    'the open state must be behind the backoff and switch gates',
   )
   // The two controls that live outside the gated block must be hidden
   // explicitly when the gate is active.
@@ -62,6 +65,11 @@ test('the drawer geometry stands down when the host owns the mobile drawer', asy
       SHELL_CSS,
       new RegExp(`html\\[${BACKOFF_ATTRIBUTE}\\] \\[data-dsh-ms="${marker}"\\][^{]*\\{[^}]*display: none !important`),
       `${marker} must disappear while backing off`,
+    )
+    assert.match(
+      SHELL_CSS,
+      new RegExp(`html\\[${MOBILE_ATTRIBUTE}="off"\\] \\[data-dsh-ms="${marker}"\\][^{]*\\{[^}]*display: none !important`),
+      `${marker} must disappear when the reader switches the adaptation off`,
     )
   }
 })
@@ -80,9 +88,9 @@ test('every selector the JavaScript drives exists in the stylesheet', async () =
   for (const marker of [
     'data-dsh-ms="drawer-button"',
     'data-dsh-ms="backdrop"',
-    'data-dsh-ms="pwa-row"',
-    'data-dsh-ms="pwa-button"',
+    'data-dsh-ms="section-divider"',
     'data-dsh-ms="setting-row"',
+    'data-dsh-ms="pwa-button"',
     'data-dsh-ms="switch"',
     'data-dsh-ms="switch-thumb"',
   ]) {
@@ -146,14 +154,27 @@ test('the installed PWA paints under the system bars and insets its content', as
   )
 })
 
-test('the smooth-scroll row matches the settings rhythm and the switch has state', async () => {
+test('the settings group uses official hairlines and the switch has state', async () => {
   const { SHELL_CSS } = await loadModule('styles')
   const row = /\[data-dsh-ms="setting-row"\] \{([^}]*)\}/.exec(SHELL_CSS)
-  assert.ok(row !== null, 'the smooth-scroll row rule must exist')
+  assert.ok(row !== null, 'the settings row rule must exist')
   assert.match(row[1], /padding: 16px 0;/)
-  assert.doesNotMatch(row[1], /border-bottom/, 'the last settings row owns no trailing divider')
+  // The exact divider the shipped General rows use.
+  assert.match(row[1], /border-bottom: 0\.5px solid var\(--dsw-alias-border-l2/)
+  // The last row still owns no trailing divider, matching the shipped section.
+  assert.match(
+    SHELL_CSS,
+    /\[data-dsh-ms="setting-row"\]:last-child \{[^}]*border-bottom: none/,
+    'the last settings row must not paint a trailing divider',
+  )
   assert.match(SHELL_CSS, /\[data-dsh-ms="setting-row-title"\] \{[^}]*font-size: 14px/)
   assert.match(SHELL_CSS, /\[data-dsh-ms="setting-row-desc"\] \{[^}]*font-size: 12px/)
+
+  // One official-token separator starts the plugin's own region.
+  const divider = /\[data-dsh-ms="section-divider"\] \{([^}]*)\}/.exec(SHELL_CSS)
+  assert.ok(divider !== null, 'the section divider rule must exist')
+  assert.match(divider[1], /border-top: 0\.5px solid var\(--dsw-alias-border-l2/)
+  assert.match(divider[1], /margin: 8px 0 0/)
 
   // The visual state must be driven by the same aria attribute the component
   // sets; a class-only lookalike would leave assistive tech out of sync.
@@ -191,17 +212,16 @@ test('no CSS template placeholder survived into the output', async () => {
   assert.ok(!SHELL_CSS.includes('${'), 'uninterpolated template placeholder')
 })
 
-test('the settings row matches the shipped row metrics', async () => {
+test('the PWA action shares the settings row layout', async () => {
   const { SHELL_CSS } = await loadModule('styles')
-  // Read off the live General section: 16px vertical rhythm, hairline divider,
-  // 14px title, 12px description. Matching them is what makes the added row
-  // look native rather than bolted on.
-  const row = /\[data-dsh-ms="pwa-row"\] \{([^}]*)\}/.exec(SHELL_CSS)
-  assert.ok(row !== null, 'the row rule must exist')
-  assert.match(row[1], /padding: 16px 0;/)
-  assert.match(row[1], /border-bottom: 1px solid/)
-  assert.match(SHELL_CSS, /\[data-dsh-ms="pwa-row-title"\] \{[^}]*font-size: 14px/)
-  assert.match(SHELL_CSS, /\[data-dsh-ms="pwa-row-desc"\] \{[^}]*font-size: 12px/)
+  // One row grammar for all three features: the install action must not keep a
+  // second, slightly different set of titles/descriptions.
+  assert.doesNotMatch(SHELL_CSS, /data-dsh-ms="pwa-row"/, 'the PWA row must use the shared row marker')
+  const button = /\[data-dsh-ms="pwa-button"\] \{([^}]*)\}/.exec(SHELL_CSS)
+  assert.ok(button !== null, 'the install button rule must exist')
+  assert.match(button[1], /flex: none;/)
+  assert.match(button[1], /white-space: nowrap;/)
+  assert.match(SHELL_CSS, /\[data-dsh-ms="pwa-button"\]:disabled \{[^}]*opacity/)
 })
 
 test('the stylesheet is a plain string safe to inline in a <style> tag', async () => {
